@@ -94,7 +94,7 @@ func splitAction(c *cli.Context) error {
 			return fmt.Errorf("impossible 0-length peek without io.EOF at offset %d\n", streamLen)
 		}
 
-		var actualFrameLen int64
+		var carletLen int64
 		var i int
 		f := fmt.Sprintf("%s-%d.car", output, i)
 		fi, err := os.Create(f)
@@ -105,10 +105,11 @@ func splitAction(c *cli.Context) error {
 			return fmt.Errorf("failed to write empty header: %s\n", err)
 		}
 
-		for actualFrameLen < int64(targetSize) {
+		for carletLen < int64(targetSize) {
 
-			frameLen, viLen := binary.Uvarint(maybeNextFrameLen)
-			if viLen <= 0 {
+			fmt.Printf("processing i = %d\n", i)
+			frameLen, viL := binary.Uvarint(maybeNextFrameLen)
+			if viL <= 0 {
 				// car file with trailing garbage behind it
 				return fmt.Errorf("aborting car stream parse: undecodeable varint at offset %d", streamLen)
 			}
@@ -117,8 +118,9 @@ func splitAction(c *cli.Context) error {
 				return fmt.Errorf("aborting car stream parse: unexpectedly large frame length of %d bytes at offset %d", frameLen, streamLen)
 			}
 
-			actualFrameLen, err = io.CopyN(fi, streamBuf, int64(viLen)+int64(frameLen))
+			actualFrameLen, err := io.CopyN(fi, streamBuf, int64(viL)+int64(frameLen))
 			streamLen += actualFrameLen
+			carletLen += actualFrameLen
 			if err != nil {
 				if err != io.EOF {
 					return fmt.Errorf("unexpected error at offset %d: %s", streamLen-actualFrameLen, err)
