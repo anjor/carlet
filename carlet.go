@@ -82,21 +82,10 @@ func splitAction(c *cli.Context) error {
 	}
 	streamLen += actualHdrLen
 
+	var i int
 	for {
-		maybeNextFrameLen, err := streamBuf.Peek(varintSize)
-		if err == io.EOF {
-			break
-		}
-		if err != nil && err != bufio.ErrBufferFull {
-			return fmt.Errorf("unexpected error at offset %d: %s\n", streamLen, err)
-		}
-		if len(maybeNextFrameLen) == 0 {
-			return fmt.Errorf("impossible 0-length peek without io.EOF at offset %d\n", streamLen)
-		}
-
-		var carletLen int64
-		var i int
 		f := fmt.Sprintf("%s-%d.car", output, i)
+		fmt.Printf("Writing file: %s\n", f)
 		fi, err := os.Create(f)
 		if err != nil {
 			return fmt.Errorf("failed to create file: %s\n", err)
@@ -105,9 +94,20 @@ func splitAction(c *cli.Context) error {
 			return fmt.Errorf("failed to write empty header: %s\n", err)
 		}
 
+		var carletLen int64
 		for carletLen < int64(targetSize) {
+			maybeNextFrameLen, err := streamBuf.Peek(varintSize)
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil && err != bufio.ErrBufferFull {
+				return fmt.Errorf("unexpected error at offset %d: %s\n", streamLen, err)
+			}
+			if len(maybeNextFrameLen) == 0 {
+				return fmt.Errorf("impossible 0-length peek without io.EOF at offset %d\n", streamLen)
+			}
 
-			fmt.Printf("processing i = %d\n", i)
+
 			frameLen, viL := binary.Uvarint(maybeNextFrameLen)
 			if viL <= 0 {
 				// car file with trailing garbage behind it
@@ -125,14 +125,13 @@ func splitAction(c *cli.Context) error {
 				if err != io.EOF {
 					return fmt.Errorf("unexpected error at offset %d: %s", streamLen-actualFrameLen, err)
 				}
-				break
+				return nil
 			}
 		}
-
+		
+		fi.Close()
 		i++
 	}
-
-	return nil
 }
 
 func main() {
