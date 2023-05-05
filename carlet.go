@@ -1,16 +1,15 @@
-package main
+package carlet
 
 import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"github.com/urfave/cli/v2"
 	"io"
 	"os"
 )
 
 const (
-	BufSize          = (4 << 20) / 128 * 127
+	bufSize          = (4 << 20) / 128 * 127
 	varintSize       = 10
 	nulRootCarHeader = "\x19" + // 25 bytes of CBOR (encoded as varint :cryingbear: )
 		// map with 2 keys
@@ -31,32 +30,9 @@ const (
 		"\x01"
 )
 
-var splitCmd = &cli.Command{
-	Name:   "split",
-	Action: splitAction,
-	Flags: []cli.Flag{
-		&cli.IntFlag{
-			Name:     "size",
-			Aliases:  []string{"s"},
-			Value:    1024 * 1024,
-			Usage:    "Target size in bytes to chunk CARs to.",
-			Required: false,
-		},
-		&cli.StringFlag{
-			Name:     "output",
-			Aliases:  []string{"o"},
-			Required: false,
-			Usage:    "output name for car files",
-		},
-	},
-}
+func SplitCar(rdr io.Reader, targetSize int, output string) error {
 
-func splitAction(c *cli.Context) error {
-
-	targetSize := c.Int("size")
-	output := c.String("output")
-
-	streamBuf := bufio.NewReaderSize(os.Stdin, BufSize)
+	streamBuf := bufio.NewReaderSize(rdr, bufSize)
 	var streamLen int64
 
 	maybeHeaderLen, err := streamBuf.Peek(varintSize)
@@ -107,7 +83,6 @@ func splitAction(c *cli.Context) error {
 				return fmt.Errorf("impossible 0-length peek without io.EOF at offset %d\n", streamLen)
 			}
 
-
 			frameLen, viL := binary.Uvarint(maybeNextFrameLen)
 			if viL <= 0 {
 				// car file with trailing garbage behind it
@@ -128,22 +103,8 @@ func splitAction(c *cli.Context) error {
 				return nil
 			}
 		}
-		
+
 		fi.Close()
 		i++
 	}
-}
-
-func main() {
-
-	app := cli.NewApp()
-	app.Name = "carlet"
-	app.Commands = []*cli.Command{splitCmd}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
 }
