@@ -124,8 +124,6 @@ func SplitCar(rdr io.Reader, targetSize int, output string) error {
 
 // SplitAndCommp splits a car file into smaller car files but also calculates commP at the same time.
 func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error) {
-	cp := new(commp.Calc)
-	r = io.TeeReader(r, cp)
 	var carFiles []CarFile
 
 	streamBuf := bufio.NewReaderSize(r, bufSize)
@@ -135,6 +133,13 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 	if err != nil {
 		return carFiles, err
 	}
+
+	cp := new(commp.Calc)
+	_, err = io.WriteString(cp, nulRootCarHeader)
+	if err != nil {
+		return nil, err
+	}
+	streamBuf = bufio.NewReaderSize(io.TeeReader(streamBuf, cp), bufSize)
 
 	var i int
 	for {
