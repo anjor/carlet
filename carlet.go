@@ -134,21 +134,18 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 		return carFiles, err
 	}
 
-	cp := new(commp.Calc)
-	_, err = io.WriteString(cp, nulRootCarHeader)
-	if err != nil {
-		return nil, err
-	}
-	streamBuf = bufio.NewReaderSize(io.TeeReader(streamBuf, cp), bufSize)
-
 	var i int
 	for {
 		fname := fmt.Sprintf("%s-%d.car", output, i)
 		fi, err := os.Create(fname)
+		cp := new(commp.Calc)
+
+		w := io.MultiWriter(fi, cp)
+
 		if err != nil {
 			return carFiles, fmt.Errorf("failed to create file: %s\n", err)
 		}
-		if _, err := io.WriteString(fi, nulRootCarHeader); err != nil {
+		if _, err := io.WriteString(w, nulRootCarHeader); err != nil {
 			return carFiles, fmt.Errorf("failed to write empty header: %s\n", err)
 		}
 
@@ -181,7 +178,7 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 				return carFiles, fmt.Errorf("aborting car stream parse: unexpectedly large frame length of %d bytes at offset %d", frameLen, streamLen)
 			}
 
-			actualFrameLen, err := io.CopyN(fi, streamBuf, int64(viL)+int64(frameLen))
+			actualFrameLen, err := io.CopyN(w, streamBuf, int64(viL)+int64(frameLen))
 			streamLen += actualFrameLen
 			carletLen += actualFrameLen
 			if err != nil {
