@@ -37,13 +37,12 @@ const (
 
 type CarFile struct {
 	Name       string
-	CarName    string
 	CommP      cid.Cid
 	PaddedSize uint64
 }
 
 // SplitCar splits a car file into smaller car files of the specified target size
-func SplitCar(rdr io.Reader, targetSize int, output string) error {
+func SplitCar(rdr io.Reader, targetSize int, namePrefix string) error {
 
 	streamBuf := bufio.NewReaderSize(rdr, bufSize)
 	var streamLen int64
@@ -73,7 +72,7 @@ func SplitCar(rdr io.Reader, targetSize int, output string) error {
 
 	var i int
 	for {
-		f := fmt.Sprintf("%s-%d.car", output, i)
+		f := fmt.Sprintf("%s%d.car", namePrefix, i)
 		fmt.Printf("Writing file: %s\n", f)
 		fi, err := os.Create(f)
 		if err != nil {
@@ -123,7 +122,7 @@ func SplitCar(rdr io.Reader, targetSize int, output string) error {
 }
 
 // SplitAndCommp splits a car file into smaller car files but also calculates commP at the same time.
-func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error) {
+func SplitAndCommp(r io.Reader, targetSize int, namePrefix string) ([]CarFile, error) {
 	var carFiles []CarFile
 
 	streamBuf := bufio.NewReaderSize(r, bufSize)
@@ -136,7 +135,7 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 
 	var i int
 	for {
-		fname := fmt.Sprintf("%s-%d.car", output, i)
+		fname := fmt.Sprintf("%s%d.car", namePrefix, i)
 		fi, err := os.Create(fname)
 		cp := new(commp.Calc)
 
@@ -153,7 +152,7 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 		for carletLen < int64(targetSize) {
 			maybeNextFrameLen, err := streamBuf.Peek(varintSize)
 			if err == io.EOF {
-				carFile, err := cleanup(cp, output, i, fi)
+				carFile, err := cleanup(cp, namePrefix, i, fi)
 				if err != nil {
 					return carFiles, err
 				}
@@ -185,7 +184,7 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 				if err != io.EOF {
 					return carFiles, fmt.Errorf("unexpected error at offset %d: %s", streamLen-actualFrameLen, err)
 				}
-				carFile, err := cleanup(cp, output, i, fi)
+				carFile, err := cleanup(cp, namePrefix, i, fi)
 				if err != nil {
 					return carFiles, err
 				}
@@ -195,7 +194,7 @@ func SplitAndCommp(r io.Reader, targetSize int, output string) ([]CarFile, error
 			}
 		}
 
-		carFile, err := cleanup(cp, output, i, fi)
+		carFile, err := cleanup(cp, namePrefix, i, fi)
 		if err != nil {
 			return carFiles, err
 		}
@@ -243,7 +242,7 @@ func resetCP(cp *commp.Calc) error {
 	return err
 }
 
-func cleanup(cp *commp.Calc, output string, i int, f *os.File) (CarFile, error) {
+func cleanup(cp *commp.Calc, namePrefix string, i int, f *os.File) (CarFile, error) {
 	rawCommP, paddedSize, err := cp.Digest()
 	if err != nil {
 		return CarFile{}, err
@@ -255,16 +254,15 @@ func cleanup(cp *commp.Calc, output string, i int, f *os.File) (CarFile, error) 
 	}
 
 	f.Close()
-	oldn := fmt.Sprintf("%s-%d.car", output, i)
-	newn := fmt.Sprintf("%s-%s-%d.car", output, commCid, i)
+	oldn := fmt.Sprintf("%s%d.car", namePrefix, i)
+	newn := fmt.Sprintf("%s%s.car", namePrefix, commCid)
 	err = os.Rename(oldn, newn)
 	if err != nil {
 		return CarFile{}, err
 	}
 
 	return CarFile{
-		Name:       output,
-		CarName:    newn,
+		Name:       newn,
 		CommP:      commCid,
 		PaddedSize: paddedSize,
 	}, nil
