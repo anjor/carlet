@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/anjor/carlet"
-	"github.com/urfave/cli/v2"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/anjor/carlet"
+	"github.com/urfave/cli/v2"
 )
 
 var splitCmd = &cli.Command{
@@ -25,7 +26,7 @@ var splitCmd = &cli.Command{
 			Name:     "output",
 			Aliases:  []string{"o"},
 			Required: false,
-			Usage:    "output name for car files",
+			Usage:    "output filename prefix for car files.",
 		},
 	},
 }
@@ -45,8 +46,8 @@ var splitAndCommPCmd = &cli.Command{
 		&cli.StringFlag{
 			Name:     "output",
 			Aliases:  []string{"o"},
-			Required: true,
-			Usage:    "optional output name for car files. Defaults to filename (stdin if streamed in from stdin).",
+			Required: false,
+			Usage:    "output filename prefix for car files.",
 		},
 		&cli.StringFlag{
 			Name:     "metadata",
@@ -83,7 +84,7 @@ func splitAndCommpAction(c *cli.Context) error {
 	}
 
 	w := csv.NewWriter(f)
-	err = w.Write([]string{"timestamp", "original data", "car file", "piece cid", "padded piece size"})
+	err = w.Write([]string{"timestamp", "filename prefix", "car file", "piece cid", "padded piece size"})
 	if err != nil {
 		return err
 	}
@@ -92,7 +93,7 @@ func splitAndCommpAction(c *cli.Context) error {
 		err = w.Write([]string{
 			time.Now().Format(time.RFC3339),
 			output,
-			c.CarName,
+			c.Name,
 			c.CommP.String(),
 			strconv.FormatUint(c.PaddedSize, 10),
 		})
